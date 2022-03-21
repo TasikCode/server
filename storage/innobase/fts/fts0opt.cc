@@ -2940,6 +2940,7 @@ retry_later:
 #ifdef WITH_WSREP
 		if (mdl) {
 			thd_release_global_mdl(fts_opt_thd, mdl);
+			mdl= nullptr;
 		}
 #endif
 	}

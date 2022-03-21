@@ -21330,7 +21330,6 @@ static int wsrep_force_checkpoint(handlerton *hton, THD * thd)
   buf_flush_sync();
   ib::info() << "Flushing buffer pool...done";
   // Force InnoDB to checkpoint
-  lsn_t lsn;
   ib::info() << "Creating checkpoint...";
   log_make_checkpoint();
   log_sys.log.flush();
