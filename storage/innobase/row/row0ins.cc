@@ -2868,6 +2868,32 @@ row_ins_sec_index_entry_low(
 		}
 	}
 
+	/* Ensure that we acquire index->lock when inserting into an
+        index with index->online_status == ONLINE_INDEX_COMPLETE, but
+        could still be subject to rollback_inplace_alter_table().
+        This prevents a concurrent change of index->online_status.
+        The memory object cannot be freed as long as we have an open
+        reference to the table, or index->table->n_ref_count > 0. */
+        const bool      check = !index->is_committed();
+        if (check) {
+                DEBUG_SYNC_C("row_ins_sec_index_enter");
+                if (mode == BTR_MODIFY_LEAF) {
+                        search_mode |= BTR_ALREADY_S_LATCHED;
+                        mtr_s_lock_index(index, &mtr);
+                } else {
+                        mtr_sx_lock_index(index, &mtr);
+                }
+
+		switch (index->online_status) {
+		case ONLINE_INDEX_COMPLETE:
+			break;
+		case ONLINE_INDEX_CREATION:
+		case ONLINE_INDEX_ABORTED:
+		case ONLINE_INDEX_ABORTED_DROPPED:
+			goto func_exit;
+		}
+        }
+
 	/* Note that we use PAGE_CUR_LE as the search mode, because then
 	the function will return in both low_match and up_match of the
 	cursor sensible values */
@@ -3580,7 +3606,7 @@ row_ins(
 		*/
 		const unsigned type = index->type;
 		if (index->type & DICT_FTS
-		    || !index->is_committed()) {
+                    || !index->is_committed()) {
 		} else if (!(type & DICT_UNIQUE) || index->n_uniq > 1
 			   || !node->vers_history_row()) {
 
